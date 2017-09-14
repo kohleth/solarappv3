@@ -1,0 +1,2 @@
+load("/Users/kohlethchia/Projects/solarappv3/data/suburbPostcode.rds")
+load("/Users/kohlethchia/Projects/solarappv3/data/vicData.rds")

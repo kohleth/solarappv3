@@ -1,0 +1,41 @@
+body {
+  padding-top: 69px;
+}
+
+.section.sidebar {
+  top: 60px;
+  background-color: rgba(250, 223, 180, 1);
+}
+
+.navbar-inverse{
+  background-color: rgba(255, 165, 0, 1);
+}
+
+.value-box {
+  color: #fff;
+}
+
+.bg-primary {
+  background-color: rgba(252, 235, 159, 1);
+}
+
+.nav-tabs-custom > .nav-tabs > li.active {
+  border-top-color: rgba(252, 235, 159, 1);
+}
+
+
+.bg-info {
+  background-color: rgba(52, 152, 219, 0.7);
+}
+
+.bg-warning {
+  background-color: rgba(243, 156, 18, 0.7);
+}
+
+.bg-success {
+  background-color: rgba(24, 188, 156, 0.7);
+}
+
+.bg-danger {
+  background-color: rgba(231, 76, 60, 0.7);
+}

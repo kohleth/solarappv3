@@ -1,0 +1,200 @@
+---
+title: "Check My Solar"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+    css: mycss.css
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+coords=readRDS("data/coords.rds")
+suburbpostcode=readRDS("data/suburbPostcode.rds")
+currentDateTime = Sys.time()
+# attr(currentDateTime,"tzone") = "Australia/Sydney"
+currentDatechr = strftime(currentDateTime,format = "%Y-%m-%d",tz="Australia/Sydney")
+if (currentDateTime > paste(currentDatechr,"21:00:01 AEST",sep = " ")) {
+  defaultDate = as.Date(currentDatechr)
+}else{
+  defaultDate = as.Date(currentDatechr)-1
+}
+print(paste("defaultDate is",defaultDate))
+```
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(RCurl)
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(RMySQL)
+source("Auth.R")
+source("R_fns/mysql.R")
+```
+
+
+Inputs {.sidebar data-width=250}
+-----------------------------------------------------------------------
+
+```{r}
+selectInput(
+  inputId = "postcode",
+  label = "Select your Suburb/Postcode",
+  choices = suburbpostcode,
+  selected = "ENDEAVOUR HILLS 3802",
+  multiple = FALSE
+)
+dateInput(
+  inputId = "date",
+  label = "Select a date",
+  min = "2015-09-16",
+  max = defaultDate,
+  value = defaultDate
+)
+
+renderText("Tip: data for any day will only be collected after 2100 AEST of that day.")
+```
+
+```{r getData}
+observe({
+  print(paste("input date is",input$date))
+  if(!is.null(input$date)){
+    Havedata = haveData_mysql(input$date)
+    if (!Havedata) {
+      if(input$date==currentDatechr&Sys.time()>as.POSIXlt("21:00:00 AEST",format="%X")){
+        updateData_mysql()
+      }else{
+        print("Don't have data, but cannot source days other than today!")
+      }
+    }else{
+      print("Have Data already.")
+    }
+  }
+})
+
+usrPostcode=reactive(gsub("[^[:digit:]]+","",input$postcode))
+```
+
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Your Suburb and Surrounding Area
+
+```{r}
+renderPlotly({
+  data0=getPVdata1Day(input$date)
+  ## calculate distance to other suburbs
+
+  userCoord=coords%>%filter(postcode==usrPostcode()%>%as.numeric)
+  
+  compareData=coords%>%
+    mutate(dlat=lat-userCoord$lat,
+           dlon=lon-userCoord$lon,
+           d=sqrt(dlat^2+dlon^2))%>%
+    filter(d<0.1)%>%
+    inner_join(data0)%>%
+    filter(size<10)%>%
+    select(size,output)%>%
+    mutate(size=round(size,2),output=round(output,2))
+  
+  # print(compareData)
+  (ggplot(compareData,aes(x=size,y=output))+
+      geom_smooth(method="lm")+
+      geom_point(color="orange")+
+      # annotate("text",x=Inf,y=Inf,label="Text",vjust=1,hjust=1)+
+      ylab("Output (kWh)")+
+      xlab("Size (kW)")+
+      theme_minimal()+
+      theme(axis.title =element_text(size=12)))%>%
+    ggplotly()%>%
+    add_annotations(
+    x= 0,
+    y= 1,
+    xref = "paper",
+    yref = "paper",
+    text = paste("Efficiency :",round(mean(compareData$output/compareData$size),2)),
+    showarrow = F,
+    font=list(color=toRGB("orange"))
+  )%>%
+    add_annotations(
+    x= 0,
+    y= 0.9,
+    xref = "paper",
+    yref = "paper",
+    text = paste("Plot based on",nrow(compareData),"systems within 10km of",usrPostcode()),
+    showarrow = F,
+    font=list(color=toRGB("orange"))
+  )
+})
+
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Past 7 days (Your Suburb and Surrounding Area)
+
+```{r}
+renderPlotly({
+  dateSeq=seq(as.Date(input$date,format="%Y-%m-%d")-6,as.Date(input$date,format="%Y-%m-%d"),by=1)%>%as.character()
+  data0=getPVdataWindow(dateSeq[1],dateSeq[7])
+  ## calculate distance to other suburbs
+
+  userCoord=coords%>%filter(postcode==usrPostcode()%>%as.numeric)
+  
+  past7Data=coords%>%
+    mutate(dlat=lat-userCoord$lat,
+           dlon=lon-userCoord$lon,
+           d=sqrt(dlat^2+dlon^2))%>%
+    filter(d<0.1)%>%
+    inner_join(data0)%>%
+    filter(size<10)%>%
+    mutate(eff=output/size)%>%
+    group_by(date)%>%
+    summarize(eff=mean(eff))%>%
+    ungroup%>%
+    right_join(data.frame(date=dateSeq,stringsAsFactors=F))%>%
+    mutate(Efficiency=round(eff,2),
+           date=format(as.Date(date,format="%Y-%m-%d"),format="%a"),
+           date=factor(date,levels=date))
+  
+  
+  # print(compareData)
+  (ggplot(past7Data,aes(x=date,y=Efficiency))+
+    geom_col(fill="orange")+
+    lims(y=c(0,6.5))+
+    ylab("Efficiency (kWh/kW)")+
+    xlab("")+
+    theme_minimal()+
+    theme(axis.title =element_text(size=12)))%>%
+    ggplotly()
+})
+```
+
+### Past Year (Victoria)
+```{r}
+renderPlotly({
+  dateSeq=seq(as.Date(input$date,format="%Y-%m-%d")-364,as.Date(input$date,format="%Y-%m-%d"),by=1)%>%as.character()
+  data0=getDailyEff(dateSeq[1],dateSeq[length(dateSeq)])
+  ## calculate distance to other suburbs
+
+  userCoord=coords%>%filter(postcode==usrPostcode()%>%as.numeric)
+  
+  pastYrData=data0%>%
+    right_join(data.frame(date=dateSeq,stringsAsFactors=F))%>%
+    mutate(Efficiency=round(Efficiency,2),
+           date=as.Date(date,format="%Y-%m-%d"))
+  
+  (ggplot(pastYrData,aes(x=date,y=Efficiency,group=1))+
+      geom_line(color="orange")+
+      geom_smooth()+
+      lims(y=c(0,6.5))+
+      ylab("Efficiency (kWh/kW)")+
+      xlab("")+
+      theme_minimal())%>%
+    ggplotly(tooltip=c("x","y"))
+})
+```
+
