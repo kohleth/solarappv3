@@ -11,13 +11,12 @@ runtime: shiny
 ```{r global, include=FALSE}
 coords=readRDS("data/coords.rds")
 suburbpostcode=readRDS("data/suburbPostcode.rds")
-currentDateTime = Sys.time()
-# attr(currentDateTime,"tzone") = "Australia/Sydney"
-currentDatechr = strftime(currentDateTime,format = "%Y-%m-%d",tz="Australia/Sydney")
-if (currentDateTime > paste(currentDatechr,"21:00:01 AEST",sep = " ")) {
-  defaultDate = as.Date(currentDatechr)
+currentDate=format(Sys.time(),tz="Australia/Sydney",format="%Y-%m-%d")
+currentTime=format(Sys.time(),tz="Australia/Sydney",format="%T")
+if (currentTime > "21:01:00") {
+  defaultDate = currentDate
 }else{
-  defaultDate = as.Date(currentDatechr)-1
+  defaultDate = as.character(as.Date(currentDate)-1)
 }
 print(paste("defaultDate is",defaultDate))
 ```
@@ -61,8 +60,8 @@ observe({
   print(paste("input date is",input$date))
   if(!is.null(input$date)){
     Havedata = haveData_mysql(input$date)
-    if (!Havedata) {
-      if(input$date==currentDatechr&Sys.time()>as.POSIXlt("21:00:00 AEST",format="%X")){
+    if (!Havedata){
+      if(input$date==defaultDate){ 
         updateData_mysql()
       }else{
         print("Don't have data, but cannot source days other than today!")
