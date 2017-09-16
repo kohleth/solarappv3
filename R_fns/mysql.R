@@ -8,7 +8,7 @@ updateData_mysql=function(){
   names(csv) = c("id","size","postcode","output")
   csv$size = csv$size / 1000
   csv$output = csv$output / 1000
-  csv$date=h$value()["Date"]%>%as.Date(format="%a, %e %b %Y %H:%M:%S GMT")
+  csv$date=h$value()["X-Payload-Date"]%>%as.Date(format="%Y%m%d")
   dbWriteTable(connection, "output", csv,append=TRUE,row.name=FALSE)  
   print("Sourcing done!")
 }
