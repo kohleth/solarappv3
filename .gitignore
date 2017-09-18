@@ -5,3 +5,5 @@
 Auth.R
 *.html
 rsconnect
+Rplots.pdf
+rmd_data
