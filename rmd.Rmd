@@ -30,7 +30,7 @@ library(RCurl)
 library(ggplot2)
 library(plotly)
 library(dplyr)
-library(RMySQL)
+library(pool)
 source("R_fns/mysql.R")
 ```
 

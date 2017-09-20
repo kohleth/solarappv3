@@ -14,30 +14,19 @@ updateData_mysql=function(){
 }
 
 haveData_mysql=function(d){
-  rs=dbSendQuery(connection,paste0("SELECT count(*) FROM output WHERE date='",d,"';"))
-  N=dbFetch(rs)
-  dbClearResult(rs)
+  N=dbGetQuery(connection,paste0("SELECT count(*) FROM output WHERE date='",d,"';"))
   unname(unlist(N))>0
 }
 
 
 getPVdata1Day=function(d){
-  rs=dbSendQuery(connection,paste0("SELECT * FROM output WHERE date='",d,"';"))
-  output=dbFetch(rs)
-  dbClearResult(rs)
-  output
+  dbGetQuery(connection,paste0("SELECT * FROM output WHERE date='",d,"';"))
 }
 
 getPVdataWindow=function(begin,end){
-  rs=dbSendQuery(connection,paste0("SELECT * FROM output WHERE date>='",begin,"' AND date<='",end,"';"))
-  output=dbFetch(rs)
-  dbClearResult(rs)
-  output
+  dbGetQuery(connection,paste0("SELECT * FROM output WHERE date>='",begin,"' AND date<='",end,"';"))
 }
 
 getDailyEff=function(begin,end){
-  rs=dbSendQuery(connection,paste0("SELECT date, AVG(output/size) as Efficiency FROM output WHERE date>='",begin,"' AND date<='",end,"' GROUP BY date;"))
-  output=dbFetch(rs)
-  dbClearResult(rs)
-  output
+  dbGetQuery(connection,paste0("SELECT date, AVG(output/size) as Efficiency FROM output WHERE date>='",begin,"' AND date<='",end,"' GROUP BY date;"))
 }
