@@ -13,7 +13,7 @@ coords=readRDS("data/coords.rds")
 suburbpostcode=readRDS("data/suburbPostcode.rds")
 ```
 
-```{r global, include=FALSE, context='setup'}
+```{r global, include=FALSE, context='server'}
 currentDate=format(Sys.time(),tz="Australia/Sydney",format="%Y-%m-%d")
 currentTime=format(Sys.time(),tz="Australia/Sydney",format="%T")
 if (currentTime > "21:01:00") {
