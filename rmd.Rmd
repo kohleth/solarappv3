@@ -13,7 +13,7 @@ coords=readRDS("data/coords.rds")
 suburbpostcode=readRDS("data/suburbPostcode.rds")
 ```
 
-```{r, global, include=FALSE}
+```{r, include=FALSE, context='setup'}
 currentDate=format(Sys.time(),tz="Australia/Sydney",format="%Y-%m-%d")
 currentTime=format(Sys.time(),tz="Australia/Sydney",format="%T")
 if (currentTime > "21:01:00") {
@@ -31,7 +31,11 @@ library(ggplot2)
 library(plotly)
 library(dplyr)
 library(pool)
+library(darksky)
+library(lubridate)
+library(mgcv)
 source("R_fns/mysql.R")
+model=readRDS("bam.rds")
 ```
 
 ```{r db, context='server-start'}
@@ -114,6 +118,7 @@ output$comparePlot=renderPlotly({
       # annotate("text",x=Inf,y=Inf,label="Text",vjust=1,hjust=1)+
       ylab("Output (kWh)")+
       xlab("Size (kW)")+
+      ggtitle("Selected Day's Output Summary")+
       theme_minimal()+
       theme(axis.title =element_text(size=12)))%>%
     ggplotly()%>%
@@ -134,10 +139,52 @@ output$comparePlot=renderPlotly({
     text = paste("Plot based on",nrow(compareData),"systems within 10km of",usrPostcode()),
     showarrow = F,
     font=list(color=toRGB("orange"))
-  )
+  )%>%
+    config(displayModeBar = F)
 })
 
 ```
+
+### Next-day forecast
+```{r}
+plotlyOutput("predictPlot")
+```
+
+```{r, context='server'}
+output$predictPlot=renderPlotly({
+  userCoord=coords%>%filter(postcode==usrPostcode()%>%as.numeric)
+  
+  tmr_weather=darksky::get_forecast_for(userCoord$lat, userCoord$lon,
+                                        timestamp=paste0(currentDate,"T12:00:00"))$daily
+  
+  newX=tmr_weather%>%
+    mutate(day=lubridate::yday(time),
+           tempMax=temperatureMax,
+           lat=userCoord$lat,
+           lon=userCoord$lon)
+  
+  req(newX)
+  pred=predict(model,newX,se.fit=T)
+  sd=model$sig2
+  
+  ggplotly(data.frame(size=0:10)%>%
+             mutate(output=size*pred$fit,
+                    lower=size*(pred$fit-2*(sd+pred$se.fit)),
+                    upper=size*(pred$fit+2*(sd+pred$se.fit)))%>%
+             round(2)%>%
+             ggplot(aes(x=size,y=output,ymin=lower,ymax=upper))+
+             geom_line(color="orange")+
+             geom_ribbon(alpha=0.4,fill="orange",show.legend = F)+
+             ylab("")+
+             ggtitle("Tomorrow's Predicted Output (kWh)")+
+             xlab("size (kW)")+
+             scale_y_continuous(breaks=seq(0,60,by=5))+
+             scale_x_continuous(breaks=0:10)+
+             theme_minimal())%>%
+    config(displayModeBar = F)
+})
+```
+
 
 Column {data-width=350}
 -----------------------------------------------------------------------
@@ -180,7 +227,8 @@ output$past7Plot=renderPlotly({
     xlab("")+
     theme_minimal()+
     theme(axis.title =element_text(size=12)))%>%
-    ggplotly()
+    ggplotly()%>%
+    config(displayModeBar = F)
 })
 ```
 
@@ -191,7 +239,7 @@ plotlyOutput("pastYearPlot")
 
 ```{r, context='server'}
 output$pastYearPlot=renderPlotly({
-  dateSeq=seq(as.Date(input$date,format="%Y-%m-%d")-364,as.Date(input$date,format="%Y-%m-%d"),by=1)%>%as.character()
+  dateSeq=seq(as.Date(currentDate,format="%Y-%m-%d")-364,as.Date(currentDate,format="%Y-%m-%d"),by=1)%>%as.character()
   data0=getDailyEff(dateSeq[1],dateSeq[length(dateSeq)])
   ## calculate distance to other suburbs
 
@@ -209,7 +257,8 @@ output$pastYearPlot=renderPlotly({
       ylab("Efficiency (kWh/kW)")+
       xlab("")+
       theme_minimal())%>%
-    ggplotly(tooltip=c("x","y"))
+    ggplotly(tooltip=c("x","y"))%>%
+    config(displayModeBar = F)
 })
 ```
 
