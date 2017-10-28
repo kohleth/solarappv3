@@ -8,22 +8,6 @@ output:
 runtime: shiny_prerendered
 ---
 
-```{r data, context='data'}
-coords=readRDS("data/coords.rds")
-suburbpostcode=readRDS("data/suburbPostcode.rds")
-```
-
-```{r, include=FALSE, context='setup'}
-currentDate=format(Sys.time(),tz="Australia/Sydney",format="%Y-%m-%d")
-currentTime=format(Sys.time(),tz="Australia/Sydney",format="%T")
-if (currentTime > "21:01:00") {
-  defaultDate = currentDate
-}else{
-  defaultDate = as.character(as.Date(currentDate)-1)
-}
-print(paste("defaultDate is",defaultDate))
-```
-
 ```{r setup, include=FALSE, context='setup'}
 library(flexdashboard)
 library(RCurl)
@@ -42,9 +26,34 @@ model=readRDS("bam.rds")
 source("Auth.R")
 ```
 
+```{r data, context='data'}
+coords=readRDS("data/coords.rds")
+suburbpostcode=readRDS("data/suburbPostcode.rds")
+```
 
 Inputs {.sidebar data-width=250}
 -----------------------------------------------------------------------
+```{r, include=FALSE, context='server'}
+currentDate=format(Sys.time(),tz="Australia/Sydney",format="%Y-%m-%d")
+currentTime=format(Sys.time(),tz="Australia/Sydney",format="%T")
+if (currentTime > "21:01:00") {
+  defaultDate = currentDate
+}else{
+  defaultDate = as.character(as.Date(currentDate)-1)
+}
+print(paste("defaultDate is",defaultDate))
+
+output$date=renderUI({
+  dateInput(
+    inputId = "date",
+    label = "Select a date",
+    min = "2015-09-16",
+    value = defaultDate, 
+    max = defaultDate
+  )
+})
+
+```
 
 ```{r}
 selectInput(
@@ -54,32 +63,27 @@ selectInput(
   selected = "ENDEAVOUR HILLS 3802",
   multiple = FALSE
 )
-dateInput(
-  inputId = "date",
-  label = "Select a date",
-  min = "2015-09-16",
-  max = defaultDate,
-  value = defaultDate
-)
+
+uiOutput("date")
 
 renderText("Tip: data for any day will only be collected after 2100 AEST of that day.")
 ```
 
 ```{r getData, context='server'}
 observe({
+  req(input$date)
   print(paste("input date is",input$date))
-  if(!is.null(input$date)){
-    Havedata = haveData_mysql(input$date)
-    if (!Havedata){
-      if(input$date==defaultDate){ 
-        updateData_mysql()
-      }else{
-        print("Don't have data, but cannot source days other than today!")
-      }
+  Havedata = haveData_mysql(input$date)
+  if (!Havedata){
+    if(input$date==defaultDate){ 
+      updateData_mysql()
     }else{
-      print("Have Data already.")
+      print("Don't have data, but cannot source days other than today!")
     }
+  }else{
+    print("Have Data already.")
   }
+  
 })
 
 usrPostcode=reactive(gsub("[^[:digit:]]+","",input$postcode))
@@ -96,6 +100,7 @@ plotlyOutput("comparePlot")
 
 ```{r, context='server'}
 output$comparePlot=renderPlotly({
+  req(input$date)
   data0=getPVdata1Day(input$date)
   ## calculate distance to other suburbs
 
@@ -196,6 +201,8 @@ plotlyOutput("past7Plot")
 
 ```{r, context='server'}
 output$past7Plot=renderPlotly({
+  req(input$date)
+
   dateSeq=seq(as.Date(input$date,format="%Y-%m-%d")-6,as.Date(input$date,format="%Y-%m-%d"),by=1)%>%as.character()
   data0=getPVdataWindow(dateSeq[1],dateSeq[7])
   ## calculate distance to other suburbs
